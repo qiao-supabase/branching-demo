@@ -5,6 +5,11 @@ project_id = "branching-demo"
 [api]
 schemas = ["public", "graphql_public", "customer_support"]
 
+[api.tls]
+enabled = true
+cert_path = "cert.pem"
+key_path = "key.pem"
+
 [db.vault]
 project_url = "env(SUPABASE_PROJECT_URL)"
 anon_key = "env(SUPABASE_AUTH_ANON_KEY)"
