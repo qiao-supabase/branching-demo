@@ -1,0 +1,6 @@
+[submodule "supabase-grafana"]
+	path = supabase-grafana
+	url = git@github.com:supabase/supabase-grafana.git
+[submodule "test-branch"]
+	path = test-branch
+	url = https://github.com/sweatybridge/test-branch.git
