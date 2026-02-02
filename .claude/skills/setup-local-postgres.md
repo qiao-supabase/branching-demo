@@ -15,18 +15,17 @@ After completing PostgreSQL setup, see [setup-gotrue.md](setup-gotrue.md) for Go
 service postgresql stop
 ```
 
-## Step 2: Configure pg_hba.conf for Local Trust
+## Step 2: Remove pg_hba.conf
 
-Update `/etc/postgresql/16/main/pg_hba.conf` to use trust authentication for local connections:
+Remove the existing pg_hba.conf so initdb can create a new one with trust authentication:
 
 ```bash
-sed -i 's/local   all             postgres                                peer/local   all             supabase_admin                          trust/' /etc/postgresql/16/main/pg_hba.conf
-sed -i 's/local   all             all                                     peer/local   all             all                                     trust/' /etc/postgresql/16/main/pg_hba.conf
+rm -f /etc/postgresql/16/main/pg_hba.conf
 ```
 
 ## Step 3: Reinitialize the Cluster
 
-Reinitialize the PostgreSQL cluster with `supabase_admin` as the bootstrap user. This allows all Supabase migrations to run correctly, including the `demote-postgres` security migration.
+Reinitialize the PostgreSQL cluster with `supabase_admin` as the bootstrap user and local trust authentication. This allows all Supabase migrations to run correctly, including the `demote-postgres` security migration.
 
 ```bash
 # Remove existing data (WARNING: destroys all data)
@@ -35,7 +34,8 @@ rm -rf /var/lib/postgresql/16/main/*
 # Reinitialize with supabase_admin as bootstrap user
 sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
   -D /var/lib/postgresql/16/main \
-  -U supabase_admin
+  -U supabase_admin \
+  --auth-local=trust
 ```
 
 ## Step 4: Start PostgreSQL
