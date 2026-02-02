@@ -5,7 +5,9 @@ This skill describes how to set up a local PostgreSQL instance with Supabase-com
 
 ## Prerequisites
 - PostgreSQL 15, 16, or 17 installed locally
-- GoTrue binary for authentication (see start-supabase.md)
+
+## Next Steps
+After completing PostgreSQL setup, see [setup-gotrue.md](setup-gotrue.md) for GoTrue (auth service) configuration.
 
 ## Step 1: Start PostgreSQL
 
@@ -113,86 +115,14 @@ $$;
 EOF
 ```
 
-## Step 4: Configure GoTrue
+## Step 4: Set Up GoTrue (Auth Service)
 
-Create `.env.gotrue` configuration file:
-
-```bash
-# Database
-DATABASE_URL=postgres://supabase_auth_admin:postgres@localhost:5432/supabase_auth?sslmode=disable
-GOTRUE_DB_DRIVER=postgres
-
-# JWT Settings
-GOTRUE_JWT_SECRET=your-super-secret-jwt-token-with-at-least-32-characters-long
-GOTRUE_JWT_EXP=3600
-GOTRUE_JWT_AUD=authenticated
-
-# API Settings
-API_EXTERNAL_URL=http://localhost:9999
-GOTRUE_API_HOST=0.0.0.0
-PORT=9999
-
-# Disable email verification for local dev
-GOTRUE_MAILER_AUTOCONFIRM=true
-GOTRUE_SMS_AUTOCONFIRM=true
-
-# Site URL
-GOTRUE_SITE_URL=http://localhost:3000
-```
-
-## Step 5: Run GoTrue Migrations
-
-```bash
-export $(cat .env.gotrue | grep -v '^#' | xargs) && ./auth migrate
-```
-
-## Step 6: Start GoTrue
-
-```bash
-set -a && source .env.gotrue && set +a && ./auth serve
-```
-
-## Step 7: Generate Service Role JWT
-
-Generate a JWT token for API access:
-
-```bash
-node -e "
-const crypto = require('crypto');
-const secret = 'your-super-secret-jwt-token-with-at-least-32-characters-long';
-
-function base64url(str) {
-  return Buffer.from(str).toString('base64')
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-const header = { alg: 'HS256', typ: 'JWT' };
-const payload = {
-  iss: 'supabase',
-  role: 'service_role',
-  iat: Math.floor(Date.now() / 1000),
-  exp: Math.floor(Date.now() / 1000) + (10 * 365 * 24 * 60 * 60)
-};
-
-const headerB64 = base64url(JSON.stringify(header));
-const payloadB64 = base64url(JSON.stringify(payload));
-const signature = crypto.createHmac('sha256', secret)
-  .update(headerB64 + '.' + payloadB64)
-  .digest('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-console.log(headerB64 + '.' + payloadB64 + '.' + signature);
-"
-```
-
-## Running Tests
-
-Set environment variables and run tests:
-
-```bash
-SUPABASE_URL="http://localhost:9999" \
-SUPABASE_SERVICE_ROLE_KEY="<your-generated-jwt>" \
-npm test
-```
+After PostgreSQL is configured, proceed to [setup-gotrue.md](setup-gotrue.md) for:
+- Downloading GoTrue binary
+- Configuration file setup
+- Running migrations
+- JWT generation
+- Starting the auth server
 
 ## Troubleshooting
 
@@ -205,12 +135,16 @@ pg_isready -h localhost
 service postgresql start
 ```
 
-### GoTrue migration errors
-- Ensure the `auth` schema exists before running migrations
-- Check that `supabase_auth_admin` has the correct permissions
+### Permission errors
+- Ensure `supabase_auth_admin` has SUPERUSER or appropriate permissions
+- Re-run: `ALTER USER supabase_auth_admin WITH SUPERUSER;`
 
-### "relation does not exist" errors
-- Verify the search_path is set correctly for the user
+### Schema not found
+- Verify the auth schema exists: `\dn` in psql
+- Re-run: `CREATE SCHEMA IF NOT EXISTS auth;`
+
+### Search path issues
+- Verify search_path is set correctly for the user
 - Run: `ALTER ROLE supabase_auth_admin SET search_path TO auth, public;`
 
 ## Schema Components
