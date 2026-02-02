@@ -70,7 +70,15 @@ GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(p_usename TEXT) TO pgbouncer;
 EOF
 ```
 
-## Step 6: Run Migrations
+## Step 6: Create pg_stat_statements Extension
+
+Create the extensions schema and pg_stat_statements extension for query performance monitoring:
+
+```bash
+psql -U supabase_admin -d postgres -c "CREATE SCHEMA IF NOT EXISTS extensions; CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;"
+```
+
+## Step 7: Run Migrations
 
 ```bash
 # Clone Supabase postgres repository
@@ -83,7 +91,7 @@ POSTGRES_PASSWORD=postgres ./migrate.sh
 
 The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-## Step 7: Verify postgres Role Was Demoted
+## Step 8: Verify postgres Role Was Demoted
 
 ```bash
 psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
