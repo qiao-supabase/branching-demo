@@ -87,6 +87,7 @@ For environments without Docker, install services individually. This option prov
 
 - **[setup-local-postgres.md](setup-local-postgres.md)** - PostgreSQL installation, database setup, Supabase-compatible schema, roles, and helper functions
 - **[setup-gotrue.md](setup-gotrue.md)** - GoTrue binary download, configuration, migrations, JWT generation, and API reference
+- **[setup-postgrest.md](setup-postgrest.md)** - PostgREST binary download, configuration, REST API setup, and usage examples
 
 ### Quick Start Summary
 
@@ -95,8 +96,11 @@ For environments without Docker, install services individually. This option prov
 3. **Download GoTrue** binary from [supabase/auth releases](https://github.com/supabase/auth/releases)
 4. **Configure GoTrue** with `.env.gotrue` (see [setup-gotrue.md](setup-gotrue.md))
 5. **Run migrations**: `./auth migrate`
-6. **Start server**: `./auth serve`
-7. **Generate JWT** and set environment variables
+6. **Start GoTrue**: `./auth serve`
+7. **Download PostgREST** binary from [PostgREST releases](https://github.com/PostgREST/postgrest/releases)
+8. **Configure PostgREST** with `postgrest.conf` (see [setup-postgrest.md](setup-postgrest.md))
+9. **Start PostgREST**: `./postgrest postgrest.conf`
+10. **Generate JWT** and set environment variables
 
 ### Environment Variables
 
