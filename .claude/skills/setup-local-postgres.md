@@ -26,6 +26,11 @@ brew services start postgresql@16
 pg_isready -h localhost
 ```
 
+**Configure postgres role with superuser and default password:**
+```bash
+sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres';"
+```
+
 ## Step 2: Initialize Database with Supabase Schema
 
 Use the official Supabase migration scripts to set up the database schema:
