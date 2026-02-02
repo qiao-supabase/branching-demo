@@ -9,106 +9,155 @@ This skill describes how to set up a local PostgreSQL instance with Supabase-com
 ## Next Steps
 After completing PostgreSQL setup, see [setup-gotrue.md](setup-gotrue.md) for GoTrue (auth service) configuration.
 
-## Step 1: Start PostgreSQL
+## Step 1: Stop PostgreSQL
 
-**Ubuntu/Debian:**
+```bash
+service postgresql stop
+```
+
+## Step 2: Replace pg_hba.conf
+
+Replace the existing pg_hba.conf with Supabase-compatible configuration:
+
+```bash
+cat > /etc/postgresql/16/main/pg_hba.conf <<'EOF'
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# Local connections
+local all  supabase_admin                 trust
+local all  all                            trust
+host  all  all           127.0.0.1/32     trust
+host  all  all           ::1/128          trust
+
+# IPv4 external connections
+host  all  all  0.0.0.0/0     scram-sha-256
+
+# IPv6 external connections
+host  all  all  ::0/0         scram-sha-256
+EOF
+```
+
+## Step 3: Reinitialize the Cluster
+
+Reinitialize the PostgreSQL cluster with `supabase_admin` as the bootstrap user. This allows all Supabase migrations to run correctly, including the `demote-postgres` security migration.
+
+```bash
+# Remove existing data (WARNING: destroys all data)
+rm -rf /var/lib/postgresql/16/main/*
+
+# Reinitialize with supabase_admin as bootstrap user
+sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
+  -D /var/lib/postgresql/16/main \
+  -U supabase_admin
+```
+
+## Step 4: Configure postgresql.conf
+
+Update postgresql.conf with Supabase-compatible settings:
+
+```bash
+cat > /etc/postgresql/16/main/postgresql.conf <<'EOF'
+# Connection settings
+listen_addresses = '*'
+port = 5432
+
+# File locations
+data_directory = '/var/lib/postgresql/16/main'
+hba_file = '/etc/postgresql/16/main/pg_hba.conf'
+ident_file = '/etc/postgresql/16/main/pg_ident.conf'
+
+# Memory
+shared_buffers = 128MB
+effective_cache_size = 128MB
+
+# WAL
+wal_level = logical
+max_wal_senders = 10
+max_replication_slots = 5
+
+# Authentication
+password_encryption = scram-sha-256
+
+# Preloaded libraries
+shared_preload_libraries = 'pg_stat_statements'
+
+# Locale
+lc_messages = 'C'
+lc_monetary = 'C'
+lc_numeric = 'C'
+lc_time = 'C'
+
+# Timezone
+timezone = 'UTC'
+log_timezone = 'UTC'
+EOF
+```
+
+## Step 5: Start PostgreSQL
+
 ```bash
 service postgresql start
 ```
 
-**macOS (Homebrew):**
+## Step 6: Create Required Schemas and Extensions
+
+Create the pgbouncer schema, extensions schema, and pg_stat_statements extension required by Supabase migrations:
+
 ```bash
-brew services start postgresql@16
+psql -U supabase_admin -d postgres <<'EOF'
+-- Create pgbouncer user and schema
+CREATE USER pgbouncer;
+REVOKE ALL PRIVILEGES ON SCHEMA public FROM pgbouncer;
+CREATE SCHEMA pgbouncer AUTHORIZATION pgbouncer;
+
+CREATE OR REPLACE FUNCTION pgbouncer.get_auth(p_usename TEXT)
+RETURNS TABLE(username TEXT, password TEXT) AS
+$$
+BEGIN
+    RAISE WARNING 'PgBouncer auth request: %', p_usename;
+    RETURN QUERY
+    SELECT usename::TEXT, passwd::TEXT FROM pg_catalog.pg_shadow
+    WHERE usename = p_usename;
+END;
+$$ LANGUAGE plpgsql SET search_path = '' SECURITY DEFINER;
+
+REVOKE ALL ON FUNCTION pgbouncer.get_auth(p_usename TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(p_usename TEXT) TO pgbouncer;
+
+-- Create extensions schema and pg_stat_statements
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
+EOF
 ```
 
-**Verify it's running:**
-```bash
-pg_isready -h localhost
-```
-
-**Configure postgres role with superuser and default password:**
-```bash
-sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres';"
-```
-
-## Step 2: Initialize Database with Supabase Schema
-
-Use the official Supabase migration scripts to set up the database schema.
-
-**Important:** The postgres role must be configured with superuser privileges and password before running migrate.sh, as the script authenticates using `POSTGRES_PASSWORD`.
+## Step 7: Run Migrations
 
 ```bash
-# Clone the supabase/postgres repository (or download just the migrations)
+# Clone Supabase postgres repository
 git clone --depth 1 https://github.com/supabase/postgres.git /tmp/supabase-postgres
 
-# Configure postgres role (required before running migrate.sh)
-sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres';"
-
-# Create the supabase_admin role (required by migrate.sh)
-sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
-
-# Run the migration script
+# Run migrations
 cd /tmp/supabase-postgres/migrations/db
 POSTGRES_PASSWORD=postgres ./migrate.sh
 ```
 
-This script will:
-- Create the `postgres` role if it doesn't exist
-- Run init scripts (schemas for auth, storage, etc.)
-- Run all migrations
-- Set up roles and permissions
+The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-### Alternative: Download and Run Directly
-
-If you don't want to clone the entire repo:
+## Step 8: Verify postgres Role Was Demoted
 
 ```bash
-# Create temp directory and download migration files
-mkdir -p /tmp/supabase-db/init-scripts /tmp/supabase-db/migrations
-
-# Download migrate.sh
-curl -sL https://raw.githubusercontent.com/supabase/postgres/develop/migrations/db/migrate.sh \
-  -o /tmp/supabase-db/migrate.sh
-chmod +x /tmp/supabase-db/migrate.sh
-
-# Download init scripts
-for f in 00000000000000-initial-schema.sql 00000000000001-auth-schema.sql \
-         00000000000002-storage-schema.sql 00000000000003-post-setup.sql; do
-  curl -sL "https://raw.githubusercontent.com/supabase/postgres/develop/migrations/db/init-scripts/$f" \
-    -o "/tmp/supabase-db/init-scripts/$f"
-done
-
-# Configure postgres role (required before running migrate.sh)
-sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres';"
-
-# Create supabase_admin role
-sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
-
-# Run migrations
-cd /tmp/supabase-db
-POSTGRES_PASSWORD=postgres ./migrate.sh
+psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
 ```
 
-## Step 3: Prepare for GoTrue Migrations
-
-The Supabase migration scripts create auth functions owned by `supabase_admin`, but GoTrue runs as `supabase_auth_admin`. Transfer ownership to allow GoTrue migrations to succeed:
-
-```bash
-sudo -u postgres psql -d supabase -c "
-ALTER FUNCTION auth.uid() OWNER TO supabase_auth_admin;
-ALTER FUNCTION auth.role() OWNER TO supabase_auth_admin;
-ALTER FUNCTION auth.email() OWNER TO supabase_auth_admin;
-"
+Expected output:
+```
+    rolname     | rolsuper
+----------------+----------
+ supabase_admin | t
+ postgres       | f
 ```
 
-## Step 4: Set Up GoTrue (Auth Service)
-
-After PostgreSQL is configured, proceed to [setup-gotrue.md](setup-gotrue.md) for:
-- Downloading GoTrue binary
-- Configuration file setup
-- Running migrations
-- JWT generation
-- Starting the auth server
+---
 
 ## Troubleshooting
 
@@ -121,19 +170,12 @@ pg_isready -h localhost
 service postgresql start
 ```
 
-### "role supabase_admin does not exist"
+### "role does not exist"
 ```bash
-sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
+psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
 ```
 
-### Permission errors
-- Ensure `supabase_admin` has SUPERUSER permissions
-- Re-run: `ALTER USER supabase_admin WITH SUPERUSER;`
-
-### Migration script errors
-- Check that all init-scripts are downloaded
-- Verify PostgreSQL version is 15+
-- Check logs for specific SQL errors
+---
 
 ## Schema Components
 
@@ -148,19 +190,21 @@ The migration scripts create these schemas:
 | `graphql_public` | GraphQL API |
 | `pgsodium` | Encryption functions |
 | `vault` | Secret management |
+| `pgbouncer` | Connection pooling authentication |
 
 ## Roles
 
 | Role | Purpose |
 |------|---------|
-| `postgres` | Database owner |
-| `supabase_admin` | Admin for migrations |
+| `postgres` | Database owner (demoted after migrations) |
+| `supabase_admin` | Bootstrap superuser for migrations |
 | `anon` | Unauthenticated API access |
 | `authenticated` | Authenticated user access |
 | `service_role` | Admin access, bypasses RLS |
 | `supabase_auth_admin` | Auth service admin |
 | `supabase_storage_admin` | Storage service admin |
 | `supabase_realtime_admin` | Realtime service admin |
+| `pgbouncer` | Connection pooler authentication |
 
 ## Reference
 

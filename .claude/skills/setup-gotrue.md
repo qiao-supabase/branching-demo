@@ -9,19 +9,10 @@ GoTrue is the authentication service used by Supabase. This skill describes how 
 
 ## Step 1: Download GoTrue Binary
 
-GoTrue is now part of the `supabase/auth` repository. Download the appropriate binary for your platform:
+GoTrue is now part of the `supabase/auth` repository. Download the binary:
 
-**Linux x86_64:**
 ```bash
 curl -L https://github.com/supabase/auth/releases/latest/download/auth-v2.186.0-x86.tar.gz -o auth.tar.gz
-tar -xzf auth.tar.gz
-rm auth.tar.gz
-chmod +x auth
-```
-
-**macOS ARM64 (Apple Silicon):**
-```bash
-curl -L https://github.com/supabase/auth/releases/latest/download/auth-v2.186.0-arm64.tar.gz -o auth.tar.gz
 tar -xzf auth.tar.gz
 rm auth.tar.gz
 chmod +x auth
@@ -36,7 +27,7 @@ Create `.env.gotrue` in your project root:
 
 ```bash
 # Database connection
-DATABASE_URL=postgres://supabase_auth_admin:postgres@localhost:5432/supabase?sslmode=disable
+DATABASE_URL=postgres://supabase_auth_admin:postgres@localhost:5432/postgres?sslmode=disable
 GOTRUE_DB_DRIVER=postgres
 
 # JWT Settings
