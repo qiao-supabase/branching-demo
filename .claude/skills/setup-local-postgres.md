@@ -38,7 +38,33 @@ sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
 service postgresql start
 ```
 
-## Step 4: Verify Bootstrap User
+## Step 4: Create pgbouncer Schema
+
+Create the pgbouncer user and authentication schema required by the Supabase migrations:
+
+```bash
+PGPASSWORD=postgres psql -U supabase_admin -d postgres <<'EOF'
+CREATE USER pgbouncer;
+REVOKE ALL PRIVILEGES ON SCHEMA public FROM pgbouncer;
+CREATE SCHEMA pgbouncer AUTHORIZATION pgbouncer;
+
+CREATE OR REPLACE FUNCTION pgbouncer.get_auth(p_usename TEXT)
+RETURNS TABLE(username TEXT, password TEXT) AS
+$$
+BEGIN
+    RAISE WARNING 'PgBouncer auth request: %', p_usename;
+    RETURN QUERY
+    SELECT usename::TEXT, passwd::TEXT FROM pg_catalog.pg_shadow
+    WHERE usename = p_usename;
+END;
+$$ LANGUAGE plpgsql SET search_path = '' SECURITY DEFINER;
+
+REVOKE ALL ON FUNCTION pgbouncer.get_auth(p_usename TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(p_usename TEXT) TO pgbouncer;
+EOF
+```
+
+## Step 5: Verify Bootstrap User
 
 ```bash
 PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolsuper = true;"
@@ -51,7 +77,7 @@ Expected output:
  supabase_admin | t
 ```
 
-## Step 5: Run Migrations
+## Step 6: Run Migrations
 
 ```bash
 # Clone Supabase postgres repository
@@ -64,7 +90,7 @@ POSTGRES_PASSWORD=postgres ./migrate.sh
 
 The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-## Step 6: Verify postgres Role Was Demoted
+## Step 7: Verify postgres Role Was Demoted
 
 ```bash
 PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
@@ -111,6 +137,7 @@ The migration scripts create these schemas:
 | `graphql_public` | GraphQL API |
 | `pgsodium` | Encryption functions |
 | `vault` | Secret management |
+| `pgbouncer` | Connection pooling authentication |
 
 ## Roles
 
@@ -124,6 +151,7 @@ The migration scripts create these schemas:
 | `supabase_auth_admin` | Auth service admin |
 | `supabase_storage_admin` | Storage service admin |
 | `supabase_realtime_admin` | Realtime service admin |
+| `pgbouncer` | Connection pooler authentication |
 
 ## Reference
 
