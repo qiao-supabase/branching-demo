@@ -9,6 +9,29 @@ export const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
+// Check if we're using standalone GoTrue (no /auth/v1 prefix)
+async function isStandaloneGoTrue(): Promise<boolean> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/health`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.name === "GoTrue";
+    }
+  } catch {
+    // Not standalone GoTrue
+  }
+  return false;
+}
+
+let _isStandalone: boolean | null = null;
+
+async function checkStandalone(): Promise<boolean> {
+  if (_isStandalone === null) {
+    _isStandalone = await isStandaloneGoTrue();
+  }
+  return _isStandalone;
+}
+
 export function getSupabaseAdmin(): SupabaseClient {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: {
@@ -18,42 +41,102 @@ export function getSupabaseAdmin(): SupabaseClient {
   });
 }
 
-export async function createUser(email: string, password: string) {
-  const supabase = getSupabaseAdmin();
+interface User {
+  id: string;
+  email?: string;
+  email_confirmed_at?: string;
+  created_at?: string;
+  [key: string]: unknown;
+}
 
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+async function adminRequest(
+  path: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const isStandalone = await checkStandalone();
+  const basePath = isStandalone ? "" : "/auth/v1";
+
+  return fetch(`${SUPABASE_URL}${basePath}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      ...options.headers,
+    },
+  });
+}
+
+export async function createUser(
+  email: string,
+  password: string
+): Promise<User> {
+  const response = await adminRequest("/admin/users", {
+    method: "POST",
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+    }),
   });
 
-  if (error) {
-    throw new Error(error.message);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.msg || data.error || "Failed to create user");
   }
 
-  return data.user;
+  return data;
 }
 
-export async function deleteUser(userId: string) {
-  const supabase = getSupabaseAdmin();
+export async function deleteUser(userId: string): Promise<void> {
+  const response = await adminRequest(`/admin/users/${userId}`, {
+    method: "DELETE",
+  });
 
-  const { error } = await supabase.auth.admin.deleteUser(userId);
-
-  if (error) {
-    throw new Error(error.message);
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.msg || data.error || "Failed to delete user");
   }
 }
 
-export async function getUser(userId: string) {
-  const supabase = getSupabaseAdmin();
+export async function getUser(userId: string): Promise<User> {
+  const response = await adminRequest(`/admin/users/${userId}`, {
+    method: "GET",
+  });
 
-  const { data, error } = await supabase.auth.admin.getUserById(userId);
+  const data = await response.json();
 
-  if (error) {
-    throw new Error(error.message);
+  if (!response.ok) {
+    throw new Error(data.msg || data.error || "User not found");
   }
 
-  return data.user;
+  return data;
+}
+
+export async function signInWithPassword(
+  email: string,
+  password: string
+): Promise<{ user: User; access_token: string }> {
+  const isStandalone = await checkStandalone();
+  const basePath = isStandalone ? "" : "/auth/v1";
+
+  const response = await fetch(`${SUPABASE_URL}${basePath}/token?grant_type=password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({ email, password }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.msg || data.error || "Failed to sign in");
+  }
+
+  return { user: data.user, access_token: data.access_token };
 }
 
 function printUsage() {

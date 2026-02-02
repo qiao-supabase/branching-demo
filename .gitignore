@@ -74,10 +74,17 @@ web_modules/
 
 # dotenv environment variable files
 .env
+.env.*
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+
+# GoTrue binary and related files
+auth
+gotrue
+gotrue.log
+migrations/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

@@ -3,30 +3,41 @@ import {
   createUser,
   deleteUser,
   getUser,
-  getSupabaseAdmin,
+  signInWithPassword,
   SUPABASE_URL,
 } from "./create-user";
 
-async function isSupabaseRunning(): Promise<boolean> {
-  try {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/health`);
-    return response.ok;
-  } catch {
-    return false;
+async function isAuthServiceRunning(): Promise<boolean> {
+  // Try both endpoints: /health for standalone GoTrue, /auth/v1/health for full Supabase
+  const endpoints = [
+    `${SUPABASE_URL}/health`,
+    `${SUPABASE_URL}/auth/v1/health`,
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint);
+      if (response.ok) return true;
+    } catch {
+      // Try next endpoint
+    }
   }
+  return false;
 }
 
 describe("create-user", () => {
   const createdUserIds: string[] = [];
-  let supabaseRunning = false;
+  let authServiceRunning = false;
 
   beforeAll(async () => {
-    supabaseRunning = await isSupabaseRunning();
-    if (!supabaseRunning) {
+    authServiceRunning = await isAuthServiceRunning();
+    if (!authServiceRunning) {
       console.warn(
-        "\n⚠️  Local Supabase is not running. Skipping integration tests."
+        "\n⚠️  Auth service is not running. Skipping integration tests."
       );
-      console.warn("   Run `supabase start` to enable these tests.\n");
+      console.warn(
+        "   Run `supabase start` or start GoTrue standalone to enable these tests.\n"
+      );
     }
   });
 
@@ -45,7 +56,7 @@ describe("create-user", () => {
   it("should create a user with valid email and password", async ({
     skip,
   }) => {
-    if (!supabaseRunning) skip();
+    if (!authServiceRunning) skip();
 
     const email = `test-${Date.now()}@example.com`;
     const password = "testpassword123";
@@ -60,7 +71,7 @@ describe("create-user", () => {
   });
 
   it("should retrieve a created user by ID", async ({ skip }) => {
-    if (!supabaseRunning) skip();
+    if (!authServiceRunning) skip();
 
     const email = `test-${Date.now()}@example.com`;
     const password = "testpassword123";
@@ -75,7 +86,7 @@ describe("create-user", () => {
   });
 
   it("should fail to create a user with duplicate email", async ({ skip }) => {
-    if (!supabaseRunning) skip();
+    if (!authServiceRunning) skip();
 
     const email = `test-${Date.now()}@example.com`;
     const password = "testpassword123";
@@ -89,7 +100,7 @@ describe("create-user", () => {
   it("should allow signing in with created user credentials", async ({
     skip,
   }) => {
-    if (!supabaseRunning) skip();
+    if (!authServiceRunning) skip();
 
     const email = `test-${Date.now()}@example.com`;
     const password = "testpassword123";
@@ -97,19 +108,18 @@ describe("create-user", () => {
     const user = await createUser(email, password);
     createdUserIds.push(user.id);
 
-    const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { user: signedInUser, access_token } = await signInWithPassword(
       email,
-      password,
-    });
+      password
+    );
 
-    expect(error).toBeNull();
-    expect(data.user).toBeDefined();
-    expect(data.user?.email).toBe(email);
+    expect(access_token).toBeDefined();
+    expect(signedInUser).toBeDefined();
+    expect(signedInUser?.email).toBe(email);
   });
 
   it("should delete a user successfully", async ({ skip }) => {
-    if (!supabaseRunning) skip();
+    if (!authServiceRunning) skip();
 
     const email = `test-${Date.now()}@example.com`;
     const password = "testpassword123";
