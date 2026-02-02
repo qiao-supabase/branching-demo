@@ -64,20 +64,7 @@ GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(p_usename TEXT) TO pgbouncer;
 EOF
 ```
 
-## Step 5: Verify Bootstrap User
-
-```bash
-PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolsuper = true;"
-```
-
-Expected output:
-```
-    rolname     | rolsuper
-----------------+----------
- supabase_admin | t
-```
-
-## Step 6: Run Migrations
+## Step 5: Run Migrations
 
 ```bash
 # Clone Supabase postgres repository
@@ -90,7 +77,7 @@ POSTGRES_PASSWORD=postgres ./migrate.sh
 
 The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-## Step 7: Verify postgres Role Was Demoted
+## Step 6: Verify postgres Role Was Demoted
 
 ```bash
 PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
