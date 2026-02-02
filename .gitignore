@@ -86,6 +86,10 @@ gotrue
 gotrue.log
 migrations/
 
+# PostgREST binary and related files
+postgrest
+postgrest.log
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
