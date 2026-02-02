@@ -81,77 +81,77 @@ npm run create-user -- user@example.com password123
 
 ## Option 3: Local PostgreSQL with GoTrue (No Docker)
 
-For environments without Docker, install services individually.
+For environments without Docker, install services individually. This option provides a lightweight setup for auth testing.
 
-### Install PostgreSQL
+> **Detailed instructions:** See [setup-local-postgres.md](setup-local-postgres.md) for complete PostgreSQL setup including schema, roles, and troubleshooting.
 
-**macOS:**
+### Quick Start
+
+**1. Install and start PostgreSQL:**
+
 ```bash
-brew install postgresql@15
-brew services start postgresql@15
+# Ubuntu/Debian
+sudo apt install postgresql-16
+service postgresql start
+
+# macOS
+brew install postgresql@16
+brew services start postgresql@16
 ```
 
-**Linux (Ubuntu/Debian):**
+**2. Set up database (see setup-local-postgres.md for details):**
+
 ```bash
-sudo apt update
-sudo apt install postgresql-15
-sudo systemctl start postgresql
+sudo -u postgres psql -c "CREATE USER supabase_auth_admin WITH PASSWORD 'postgres' SUPERUSER;"
+sudo -u postgres psql -c "CREATE DATABASE supabase_auth OWNER supabase_auth_admin;"
+sudo -u postgres psql -d supabase_auth -c "CREATE SCHEMA IF NOT EXISTS auth;"
+sudo -u postgres psql -d supabase_auth -c "ALTER ROLE supabase_auth_admin SET search_path TO auth, public;"
 ```
 
-**Windows:**
-Download from https://www.postgresql.org/download/windows/
-
-### Install GoTrue (Auth Service)
-
-GoTrue is the Supabase Auth service. Download the binary:
+**3. Download GoTrue (Auth Service):**
 
 ```bash
-# Download latest release
-curl -L https://github.com/supabase/gotrue/releases/latest/download/gotrue-linux-amd64 -o gotrue
-chmod +x gotrue
+# Linux x86_64
+curl -L https://github.com/supabase/auth/releases/latest/download/auth-v2.186.0-x86.tar.gz | tar -xz
 
-# Or on macOS
-curl -L https://github.com/supabase/gotrue/releases/latest/download/gotrue-darwin-amd64 -o gotrue
-chmod +x gotrue
+# macOS ARM64
+curl -L https://github.com/supabase/auth/releases/latest/download/auth-v2.186.0-arm64.tar.gz | tar -xz
 ```
 
-### Configure GoTrue
-
-Create a `.env` file for GoTrue:
+**4. Create `.env.gotrue` configuration:**
 
 ```bash
-# Database
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
-
-# JWT Settings
-GOTRUE_JWT_SECRET=your-super-secret-jwt-token-with-at-least-32-characters
+DATABASE_URL=postgres://supabase_auth_admin:postgres@localhost:5432/supabase_auth?sslmode=disable
+GOTRUE_DB_DRIVER=postgres
+GOTRUE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long
 GOTRUE_JWT_EXP=3600
-
-# API Settings
+GOTRUE_JWT_AUD=authenticated
 API_EXTERNAL_URL=http://localhost:9999
 GOTRUE_API_HOST=0.0.0.0
 PORT=9999
-
-# Mailer (disable for local dev)
 GOTRUE_MAILER_AUTOCONFIRM=true
-GOTRUE_SMTP_ADMIN_EMAIL=admin@example.com
-
-# Site URL
+GOTRUE_SMS_AUTOCONFIRM=true
 GOTRUE_SITE_URL=http://localhost:3000
 ```
 
-### Start GoTrue
+**5. Run migrations and start GoTrue:**
 
 ```bash
-./gotrue
+# Run migrations
+export $(cat .env.gotrue | grep -v '^#' | xargs) && ./auth migrate
+
+# Start server
+set -a && source .env.gotrue && set +a && ./auth serve
 ```
 
-### Update Environment for CLI
+**6. Set environment for CLI:**
 
 ```bash
 export SUPABASE_URL="http://localhost:9999"
-export SUPABASE_SERVICE_ROLE_KEY="your-jwt-token"
+export SUPABASE_SERVICE_ROLE_KEY="<your-generated-jwt>"
 ```
+
+See [setup-local-postgres.md](setup-local-postgres.md) for JWT generation instructions.
 
 ---
 
