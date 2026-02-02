@@ -35,8 +35,7 @@ rm -rf /var/lib/postgresql/16/main/*
 # Reinitialize with supabase_admin as bootstrap user
 sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
   -D /var/lib/postgresql/16/main \
-  -U supabase_admin \
-  --pwfile=<(echo 'postgres')
+  -U supabase_admin
 ```
 
 ## Step 4: Start PostgreSQL
