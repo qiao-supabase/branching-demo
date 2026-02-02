@@ -76,7 +76,19 @@ cd /tmp/supabase-db
 POSTGRES_PASSWORD=postgres ./migrate.sh
 ```
 
-## Step 3: Set Up GoTrue (Auth Service)
+## Step 3: Prepare for GoTrue Migrations
+
+The Supabase migration scripts create auth functions owned by `supabase_admin`, but GoTrue runs as `supabase_auth_admin`. Transfer ownership to allow GoTrue migrations to succeed:
+
+```bash
+sudo -u postgres psql -d supabase -c "
+ALTER FUNCTION auth.uid() OWNER TO supabase_auth_admin;
+ALTER FUNCTION auth.role() OWNER TO supabase_auth_admin;
+ALTER FUNCTION auth.email() OWNER TO supabase_auth_admin;
+"
+```
+
+## Step 4: Set Up GoTrue (Auth Service)
 
 After PostgreSQL is configured, proceed to [setup-gotrue.md](setup-gotrue.md) for:
 - Downloading GoTrue binary

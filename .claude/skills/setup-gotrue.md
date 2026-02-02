@@ -36,7 +36,7 @@ Create `.env.gotrue` in your project root:
 
 ```bash
 # Database connection
-DATABASE_URL=postgres://supabase_auth_admin:postgres@localhost:5432/supabase_auth?sslmode=disable
+DATABASE_URL=postgres://supabase_auth_admin:postgres@localhost:5432/supabase?sslmode=disable
 GOTRUE_DB_DRIVER=postgres
 
 # JWT Settings
