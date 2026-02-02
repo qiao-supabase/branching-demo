@@ -51,13 +51,55 @@ sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
   -U supabase_admin
 ```
 
-## Step 4: Start PostgreSQL
+## Step 4: Configure postgresql.conf
+
+Update postgresql.conf with Supabase-compatible settings:
+
+```bash
+cat > /etc/postgresql/16/main/postgresql.conf <<'EOF'
+# Connection settings
+listen_addresses = '*'
+port = 5432
+
+# File locations
+data_directory = '/var/lib/postgresql/16/main'
+hba_file = '/etc/postgresql/16/main/pg_hba.conf'
+ident_file = '/etc/postgresql/16/main/pg_ident.conf'
+
+# Memory
+shared_buffers = 128MB
+effective_cache_size = 128MB
+
+# WAL
+wal_level = logical
+max_wal_senders = 10
+max_replication_slots = 5
+
+# Authentication
+password_encryption = scram-sha-256
+
+# Preloaded libraries
+shared_preload_libraries = 'pg_stat_statements'
+
+# Locale
+lc_messages = 'C'
+lc_monetary = 'C'
+lc_numeric = 'C'
+lc_time = 'C'
+
+# Timezone
+timezone = 'UTC'
+log_timezone = 'UTC'
+EOF
+```
+
+## Step 5: Start PostgreSQL
 
 ```bash
 service postgresql start
 ```
 
-## Step 5: Create Required Schemas and Extensions
+## Step 6: Create Required Schemas and Extensions
 
 Create the pgbouncer schema, extensions schema, and pg_stat_statements extension required by Supabase migrations:
 
@@ -88,7 +130,7 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
 EOF
 ```
 
-## Step 6: Run Migrations
+## Step 7: Run Migrations
 
 ```bash
 # Clone Supabase postgres repository
@@ -101,7 +143,7 @@ POSTGRES_PASSWORD=postgres ./migrate.sh
 
 The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-## Step 7: Verify postgres Role Was Demoted
+## Step 8: Verify postgres Role Was Demoted
 
 ```bash
 psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
