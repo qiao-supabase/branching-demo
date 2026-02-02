@@ -26,96 +26,57 @@ brew services start postgresql@16
 pg_isready -h localhost
 ```
 
-## Step 2: Create Database and User
+## Step 2: Initialize Database with Supabase Schema
+
+Use the official Supabase migration scripts to set up the database schema:
 
 ```bash
-# Create the auth admin user
-sudo -u postgres psql -c "CREATE USER supabase_auth_admin WITH PASSWORD 'postgres' SUPERUSER;"
+# Clone the supabase/postgres repository (or download just the migrations)
+git clone --depth 1 https://github.com/supabase/postgres.git /tmp/supabase-postgres
 
-# Create the database
-sudo -u postgres psql -c "CREATE DATABASE supabase_auth OWNER supabase_auth_admin;"
+# Create the supabase_admin role (required by migrate.sh)
+sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
 
-# Create the auth schema
-sudo -u postgres psql -d supabase_auth -c "CREATE SCHEMA IF NOT EXISTS auth;"
-
-# Set search path for the user
-sudo -u postgres psql -d supabase_auth -c "ALTER ROLE supabase_auth_admin SET search_path TO auth, public;"
+# Run the migration script
+cd /tmp/supabase-postgres/migrations/db
+POSTGRES_PASSWORD=postgres ./migrate.sh
 ```
 
-## Step 3: Apply Supabase-Compatible Schema
+This script will:
+- Create the `postgres` role if it doesn't exist
+- Run init scripts (schemas for auth, storage, etc.)
+- Run all migrations
+- Set up roles and permissions
 
-Create and run the following SQL to set up Supabase-compatible schemas, roles, and functions:
+### Alternative: Download and Run Directly
+
+If you don't want to clone the entire repo:
 
 ```bash
-sudo -u postgres psql -d supabase_auth << 'EOF'
--- Create schemas
-CREATE SCHEMA IF NOT EXISTS auth;
-CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE SCHEMA IF NOT EXISTS storage;
-CREATE SCHEMA IF NOT EXISTS realtime;
-CREATE SCHEMA IF NOT EXISTS graphql_public;
+# Create temp directory and download migration files
+mkdir -p /tmp/supabase-db/init-scripts /tmp/supabase-db/migrations
 
--- Install available extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
+# Download migrate.sh
+curl -sL https://raw.githubusercontent.com/supabase/postgres/develop/migrations/db/migrate.sh \
+  -o /tmp/supabase-db/migrate.sh
+chmod +x /tmp/supabase-db/migrate.sh
 
--- Create Supabase roles
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN
-        CREATE ROLE anon NOLOGIN NOINHERIT;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN
-        CREATE ROLE authenticated NOLOGIN NOINHERIT;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN
-        CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
-        CREATE ROLE supabase_auth_admin NOLOGIN NOINHERIT;
-    END IF;
-    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN
-        CREATE ROLE supabase_storage_admin NOLOGIN NOINHERIT;
-    END IF;
-END
-$$;
+# Download init scripts
+for f in 00000000000000-initial-schema.sql 00000000000001-auth-schema.sql \
+         00000000000002-storage-schema.sql 00000000000003-post-setup.sql; do
+  curl -sL "https://raw.githubusercontent.com/supabase/postgres/develop/migrations/db/init-scripts/$f" \
+    -o "/tmp/supabase-db/init-scripts/$f"
+done
 
--- Grant schema permissions
-GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
-GRANT USAGE ON SCHEMA extensions TO postgres, anon, authenticated, service_role;
-GRANT USAGE ON SCHEMA auth TO postgres, anon, authenticated, service_role;
-GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
-GRANT ALL ON SCHEMA storage TO supabase_storage_admin;
+# Create supabase_admin role
+sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
 
--- Create auth helper functions
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
-$$;
-
-CREATE OR REPLACE FUNCTION auth.role() RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT NULLIF(current_setting('request.jwt.claim.role', true), '')::text;
-$$;
-
-CREATE OR REPLACE FUNCTION auth.email() RETURNS text
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT NULLIF(current_setting('request.jwt.claim.email', true), '')::text;
-$$;
-
-CREATE OR REPLACE FUNCTION auth.jwt() RETURNS jsonb
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT COALESCE(current_setting('request.jwt.claims', true), '{}')::jsonb;
-$$;
-EOF
+# Run migrations
+cd /tmp/supabase-db
+POSTGRES_PASSWORD=postgres ./migrate.sh
 ```
 
-## Step 4: Set Up GoTrue (Auth Service)
+## Step 3: Set Up GoTrue (Auth Service)
 
 After PostgreSQL is configured, proceed to [setup-gotrue.md](setup-gotrue.md) for:
 - Downloading GoTrue binary
@@ -135,34 +96,48 @@ pg_isready -h localhost
 service postgresql start
 ```
 
+### "role supabase_admin does not exist"
+```bash
+sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
+```
+
 ### Permission errors
-- Ensure `supabase_auth_admin` has SUPERUSER or appropriate permissions
-- Re-run: `ALTER USER supabase_auth_admin WITH SUPERUSER;`
+- Ensure `supabase_admin` has SUPERUSER permissions
+- Re-run: `ALTER USER supabase_admin WITH SUPERUSER;`
 
-### Schema not found
-- Verify the auth schema exists: `\dn` in psql
-- Re-run: `CREATE SCHEMA IF NOT EXISTS auth;`
-
-### Search path issues
-- Verify search_path is set correctly for the user
-- Run: `ALTER ROLE supabase_auth_admin SET search_path TO auth, public;`
+### Migration script errors
+- Check that all init-scripts are downloaded
+- Verify PostgreSQL version is 15+
+- Check logs for specific SQL errors
 
 ## Schema Components
 
+The migration scripts create these schemas:
+
 | Schema | Purpose |
 |--------|---------|
-| `auth` | User authentication tables |
-| `extensions` | PostgreSQL extensions |
+| `auth` | User authentication (GoTrue) |
 | `storage` | File storage metadata |
 | `realtime` | Real-time subscriptions |
+| `extensions` | PostgreSQL extensions |
 | `graphql_public` | GraphQL API |
+| `pgsodium` | Encryption functions |
+| `vault` | Secret management |
 
 ## Roles
 
 | Role | Purpose |
 |------|---------|
+| `postgres` | Database owner |
+| `supabase_admin` | Admin for migrations |
 | `anon` | Unauthenticated API access |
 | `authenticated` | Authenticated user access |
 | `service_role` | Admin access, bypasses RLS |
 | `supabase_auth_admin` | Auth service admin |
 | `supabase_storage_admin` | Storage service admin |
+| `supabase_realtime_admin` | Realtime service admin |
+
+## Reference
+
+- Migration scripts: https://github.com/supabase/postgres/tree/develop/migrations/db
+- Supabase Postgres: https://github.com/supabase/postgres
