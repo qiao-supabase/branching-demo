@@ -27,8 +27,9 @@ rm -rf /var/lib/postgresql/16/main/*
 sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
   -D /var/lib/postgresql/16/main \
   -U supabase_admin \
-  --auth-local=trust \
-  --auth-host=scram-sha-256
+  --auth-local=scram-sha-256 \
+  --auth-host=scram-sha-256 \
+  --pwfile=<(echo 'postgres')
 ```
 
 ## Step 3: Start PostgreSQL
@@ -40,7 +41,7 @@ service postgresql start
 ## Step 4: Verify Bootstrap User
 
 ```bash
-psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolsuper = true;"
+PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolsuper = true;"
 ```
 
 Expected output:
@@ -50,12 +51,9 @@ Expected output:
  supabase_admin | t
 ```
 
-## Step 5: Set Password and Run Migrations
+## Step 5: Run Migrations
 
 ```bash
-# Set password for supabase_admin
-psql -U supabase_admin -d postgres -c "ALTER USER supabase_admin WITH PASSWORD 'postgres';"
-
 # Clone Supabase postgres repository
 git clone --depth 1 https://github.com/supabase/postgres.git /tmp/supabase-postgres
 
@@ -69,7 +67,7 @@ The `demote-postgres` migration will succeed because `supabase_admin` is the boo
 ## Step 6: Verify postgres Role Was Demoted
 
 ```bash
-psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
+PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
 ```
 
 Expected output:
@@ -95,7 +93,7 @@ service postgresql start
 
 ### "role does not exist"
 ```bash
-psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
+PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
 ```
 
 ---
