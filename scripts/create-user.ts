@@ -1,12 +1,60 @@
 #!/usr/bin/env npx tsx
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 // Default local Supabase configuration
-const SUPABASE_URL = process.env.SUPABASE_URL || "http://localhost:54321";
-const SUPABASE_SERVICE_ROLE_KEY =
+export const SUPABASE_URL =
+  process.env.SUPABASE_URL || "http://localhost:54321";
+export const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+
+export function getSupabaseAdmin(): SupabaseClient {
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+export async function createUser(email: string, password: string) {
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.user;
+}
+
+export async function deleteUser(userId: string) {
+  const supabase = getSupabaseAdmin();
+
+  const { error } = await supabase.auth.admin.deleteUser(userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+export async function getUser(userId: string) {
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase.auth.admin.getUserById(userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data.user;
+}
 
 function printUsage() {
   console.log(`
@@ -26,34 +74,6 @@ Examples:
   npm run create-user -- user@example.com mypassword123
   npm run create-user -- test@test.com secretpass
 `);
-}
-
-async function createUser(email: string, password: string) {
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  console.log(`Creating user: ${email}`);
-  console.log(`Supabase URL: ${SUPABASE_URL}`);
-
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  });
-
-  if (error) {
-    console.error("Error creating user:", error.message);
-    process.exit(1);
-  }
-
-  console.log("\nUser created successfully!");
-  console.log("User ID:", data.user.id);
-  console.log("Email:", data.user.email);
-  console.log("Created at:", data.user.created_at);
 }
 
 async function main() {
@@ -82,7 +102,24 @@ async function main() {
     process.exit(1);
   }
 
-  await createUser(email, password);
+  try {
+    console.log(`Creating user: ${email}`);
+    console.log(`Supabase URL: ${SUPABASE_URL}`);
+
+    const user = await createUser(email, password);
+
+    console.log("\nUser created successfully!");
+    console.log("User ID:", user.id);
+    console.log("Email:", user.email);
+    console.log("Created at:", user.created_at);
+  } catch (error) {
+    console.error("Error creating user:", (error as Error).message);
+    process.exit(1);
+  }
 }
 
-main();
+// Only run main if this is the entry point
+const isMain = process.argv[1]?.includes("create-user");
+if (isMain) {
+  main();
+}
