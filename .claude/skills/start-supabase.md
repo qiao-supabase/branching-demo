@@ -98,8 +98,8 @@ For environments without Docker, install services individually. This option prov
 5. **Run migrations**: `./auth migrate`
 6. **Start GoTrue**: `./auth serve`
 7. **Download PostgREST** binary from [PostgREST releases](https://github.com/PostgREST/postgrest/releases)
-8. **Configure PostgREST** with `postgrest.conf` (see [setup-postgrest.md](setup-postgrest.md))
-9. **Start PostgREST**: `./postgrest postgrest.conf`
+8. **Configure PostgREST** with environment variables (see [setup-postgrest.md](setup-postgrest.md))
+9. **Start PostgREST**: `./postgrest`
 10. **Generate JWT** and set environment variables
 
 ### Environment Variables

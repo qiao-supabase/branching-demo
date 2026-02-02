@@ -48,47 +48,56 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authen
 EOF
 ```
 
-## Step 3: Create Configuration File
+## Step 3: Set Environment Variables
 
-Create `postgrest.conf` in your project root:
+PostgREST can be configured entirely via environment variables (prefixed with `PGRST_`):
 
 ```bash
-cat > postgrest.conf <<'EOF'
-# PostgREST Configuration
-
 # Database connection
-db-uri = "postgres://authenticator:postgres@localhost:5432/postgres"
+export PGRST_DB_URI="postgres://authenticator:postgres@localhost:5432/postgres"
 
 # Schema to expose
-db-schemas = "public"
+export PGRST_DB_SCHEMAS="public"
 
 # Anonymous role (used when no JWT provided)
-db-anon-role = "anon"
+export PGRST_DB_ANON_ROLE="anon"
 
 # JWT secret (must match GOTRUE_JWT_SECRET)
-jwt-secret = "super-secret-jwt-token-with-at-least-32-characters-long"
+export PGRST_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long"
 
 # Server settings
-server-host = "0.0.0.0"
-server-port = 3000
+export PGRST_SERVER_HOST="0.0.0.0"
+export PGRST_SERVER_PORT="3000"
 
 # Role claim key in JWT
-jwt-role-claim-key = ".role"
+export PGRST_JWT_ROLE_CLAIM_KEY=".role"
 
 # Log level
-log-level = "info"
-EOF
+export PGRST_LOG_LEVEL="info"
 ```
 
 ## Step 4: Start PostgREST Server
 
 ```bash
-./postgrest postgrest.conf
+./postgrest
 ```
 
 Or run in background:
 ```bash
-./postgrest postgrest.conf > postgrest.log 2>&1 &
+./postgrest > postgrest.log 2>&1 &
+```
+
+Or start with inline environment variables:
+```bash
+PGRST_DB_URI="postgres://authenticator:postgres@localhost:5432/postgres" \
+PGRST_DB_SCHEMAS="public" \
+PGRST_DB_ANON_ROLE="anon" \
+PGRST_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long" \
+PGRST_SERVER_HOST="0.0.0.0" \
+PGRST_SERVER_PORT="3000" \
+PGRST_JWT_ROLE_CLAIM_KEY=".role" \
+PGRST_LOG_LEVEL="info" \
+./postgrest
 ```
 
 **Verify it's running:**
@@ -207,11 +216,11 @@ cat postgrest.log
 
 # Restart PostgREST
 pkill -f postgrest
-./postgrest postgrest.conf > postgrest.log 2>&1 &
+./postgrest > postgrest.log 2>&1 &
 ```
 
 ### JWT authentication errors
-- Ensure JWT is signed with the same secret as `jwt-secret` in postgrest.conf
+- Ensure JWT is signed with the same secret as `PGRST_JWT_SECRET`
 - Check that `role` claim matches a valid PostgreSQL role (anon, authenticated, service_role)
 - Verify JWT hasn't expired
 
@@ -229,18 +238,18 @@ Or restart PostgREST after schema changes.
 pkill -f "./postgrest"
 ```
 
-## Configuration Reference
+## Environment Variables Reference
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `db-uri` | PostgreSQL connection string | Required |
-| `db-schemas` | Schemas to expose | `public` |
-| `db-anon-role` | Role for unauthenticated requests | Required |
-| `jwt-secret` | Secret for verifying JWTs | Required |
-| `server-host` | Host to bind to | `127.0.0.1` |
-| `server-port` | Port to listen on | `3000` |
-| `jwt-role-claim-key` | JSON path to role in JWT | `.role` |
-| `log-level` | Logging verbosity | `error` |
+| `PGRST_DB_URI` | PostgreSQL connection string | Required |
+| `PGRST_DB_SCHEMAS` | Schemas to expose | `public` |
+| `PGRST_DB_ANON_ROLE` | Role for unauthenticated requests | Required |
+| `PGRST_JWT_SECRET` | Secret for verifying JWTs | Required |
+| `PGRST_SERVER_HOST` | Host to bind to | `127.0.0.1` |
+| `PGRST_SERVER_PORT` | Port to listen on | `3000` |
+| `PGRST_JWT_ROLE_CLAIM_KEY` | JSON path to role in JWT | `.role` |
+| `PGRST_LOG_LEVEL` | Logging verbosity | `error` |
 
 ## Reference
 
