@@ -15,7 +15,16 @@ After completing PostgreSQL setup, see [setup-gotrue.md](setup-gotrue.md) for Go
 service postgresql stop
 ```
 
-## Step 2: Reinitialize the Cluster
+## Step 2: Configure pg_hba.conf for Local Trust
+
+Update `/etc/postgresql/16/main/pg_hba.conf` to use trust authentication for local connections:
+
+```bash
+sed -i 's/local   all             postgres                                peer/local   all             supabase_admin                          trust/' /etc/postgresql/16/main/pg_hba.conf
+sed -i 's/local   all             all                                     peer/local   all             all                                     trust/' /etc/postgresql/16/main/pg_hba.conf
+```
+
+## Step 3: Reinitialize the Cluster
 
 Reinitialize the PostgreSQL cluster with `supabase_admin` as the bootstrap user. This allows all Supabase migrations to run correctly, including the `demote-postgres` security migration.
 
@@ -27,23 +36,21 @@ rm -rf /var/lib/postgresql/16/main/*
 sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
   -D /var/lib/postgresql/16/main \
   -U supabase_admin \
-  --auth-local=scram-sha-256 \
-  --auth-host=scram-sha-256 \
   --pwfile=<(echo 'postgres')
 ```
 
-## Step 3: Start PostgreSQL
+## Step 4: Start PostgreSQL
 
 ```bash
 service postgresql start
 ```
 
-## Step 4: Create pgbouncer Schema
+## Step 5: Create pgbouncer Schema
 
 Create the pgbouncer user and authentication schema required by the Supabase migrations:
 
 ```bash
-PGPASSWORD=postgres psql -U supabase_admin -d postgres <<'EOF'
+psql -U supabase_admin -d postgres <<'EOF'
 CREATE USER pgbouncer;
 REVOKE ALL PRIVILEGES ON SCHEMA public FROM pgbouncer;
 CREATE SCHEMA pgbouncer AUTHORIZATION pgbouncer;
@@ -64,7 +71,7 @@ GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(p_usename TEXT) TO pgbouncer;
 EOF
 ```
 
-## Step 5: Run Migrations
+## Step 6: Run Migrations
 
 ```bash
 # Clone Supabase postgres repository
@@ -77,10 +84,10 @@ POSTGRES_PASSWORD=postgres ./migrate.sh
 
 The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-## Step 6: Verify postgres Role Was Demoted
+## Step 7: Verify postgres Role Was Demoted
 
 ```bash
-PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
+psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
 ```
 
 Expected output:
@@ -106,7 +113,7 @@ service postgresql start
 
 ### "role does not exist"
 ```bash
-PGPASSWORD=postgres psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
+psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
 ```
 
 ---
