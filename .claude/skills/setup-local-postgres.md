@@ -33,11 +33,16 @@ sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres'
 
 ## Step 2: Initialize Database with Supabase Schema
 
-Use the official Supabase migration scripts to set up the database schema:
+Use the official Supabase migration scripts to set up the database schema.
+
+**Important:** The postgres role must be configured with superuser privileges and password before running migrate.sh, as the script authenticates using `POSTGRES_PASSWORD`.
 
 ```bash
 # Clone the supabase/postgres repository (or download just the migrations)
 git clone --depth 1 https://github.com/supabase/postgres.git /tmp/supabase-postgres
+
+# Configure postgres role (required before running migrate.sh)
+sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres';"
 
 # Create the supabase_admin role (required by migrate.sh)
 sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
@@ -72,6 +77,9 @@ for f in 00000000000000-initial-schema.sql 00000000000001-auth-schema.sql \
   curl -sL "https://raw.githubusercontent.com/supabase/postgres/develop/migrations/db/init-scripts/$f" \
     -o "/tmp/supabase-db/init-scripts/$f"
 done
+
+# Configure postgres role (required before running migrate.sh)
+sudo -u postgres psql -c "ALTER USER postgres WITH SUPERUSER PASSWORD 'postgres';"
 
 # Create supabase_admin role
 sudo -u postgres psql -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
