@@ -27,39 +27,17 @@ rm -rf /var/lib/postgresql/16/main/*
 sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
   -D /var/lib/postgresql/16/main \
   -U supabase_admin \
-  --auth-local=peer \
+  --auth-local=trust \
   --auth-host=scram-sha-256
 ```
 
-## Step 3: Update pg_hba.conf
-
-Edit `/etc/postgresql/16/main/pg_hba.conf` to use `supabase_admin` and `trust` for local connections:
-
-```bash
-# Find and replace the authentication settings
-# Change:
-#   local   all             postgres                                peer
-#   local   all             all                                     peer
-# To:
-#   local   all             supabase_admin                          trust
-#   local   all             all                                     trust
-```
-
-Or run this command to update it:
-```bash
-sed -i 's/local   all             postgres                                peer/local   all             supabase_admin                          trust/' /etc/postgresql/16/main/pg_hba.conf
-sed -i 's/local   all             all                                     peer/local   all             all                                     trust/' /etc/postgresql/16/main/pg_hba.conf
-chown postgres:postgres /etc/postgresql/16/main/pg_hba.conf
-chmod 640 /etc/postgresql/16/main/pg_hba.conf
-```
-
-## Step 4: Start PostgreSQL
+## Step 3: Start PostgreSQL
 
 ```bash
 service postgresql start
 ```
 
-## Step 5: Verify Bootstrap User
+## Step 4: Verify Bootstrap User
 
 ```bash
 psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolsuper = true;"
@@ -72,7 +50,7 @@ Expected output:
  supabase_admin | t
 ```
 
-## Step 6: Set Password and Run Migrations
+## Step 5: Set Password and Run Migrations
 
 ```bash
 # Set password for supabase_admin
@@ -88,7 +66,7 @@ POSTGRES_PASSWORD=postgres ./migrate.sh
 
 The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
 
-## Step 7: Verify postgres Role Was Demoted
+## Step 6: Verify postgres Role Was Demoted
 
 ```bash
 psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
@@ -117,20 +95,7 @@ service postgresql start
 
 ### "role does not exist"
 ```bash
-# For supabase_admin
 psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
-```
-
-### Peer authentication failed
-This happens when the OS user doesn't match the database user. Solutions:
-1. Use `trust` authentication in pg_hba.conf (recommended for local dev)
-2. Connect via TCP: `psql -h 127.0.0.1 -U username`
-
-### Permission errors on pg_hba.conf
-```bash
-chown postgres:postgres /etc/postgresql/16/main/pg_hba.conf
-chmod 640 /etc/postgresql/16/main/pg_hba.conf
-service postgresql restart
 ```
 
 ---
