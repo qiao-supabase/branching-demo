@@ -88,6 +88,7 @@ For environments without Docker, install services individually. This option prov
 - **[setup-local-postgres.md](setup-local-postgres.md)** - PostgreSQL installation, database setup, Supabase-compatible schema, roles, and helper functions
 - **[setup-gotrue.md](setup-gotrue.md)** - GoTrue binary download, configuration, migrations, JWT generation, and API reference
 - **[setup-postgrest.md](setup-postgrest.md)** - PostgREST binary download, configuration, REST API setup, and usage examples
+- **[setup-kong.md](setup-kong.md)** - Kong API gateway setup, routing configuration, and unified API endpoint
 
 ### Quick Start Summary
 
@@ -100,10 +101,21 @@ For environments without Docker, install services individually. This option prov
 7. **Download PostgREST** binary from [PostgREST releases](https://github.com/PostgREST/postgrest/releases)
 8. **Configure PostgREST** with environment variables (see [setup-postgrest.md](setup-postgrest.md))
 9. **Start PostgREST**: `./postgrest`
-10. **Generate JWT** and set environment variables
+10. **Install Kong** (see [setup-kong.md](setup-kong.md))
+11. **Configure Kong** with `kong.yml` (included in project root)
+12. **Start Kong**: `kong start` (routes `/auth/v1/*` to GoTrue, `/rest/v1/*` to PostgREST)
+13. **Set environment variables** for unified API access via Kong
 
 ### Environment Variables
 
+With Kong as the API gateway:
+```bash
+export SUPABASE_URL="http://localhost:8000"
+export SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+```
+
+Without Kong (direct GoTrue access):
 ```bash
 export SUPABASE_URL="http://localhost:9999"
 export SUPABASE_SERVICE_ROLE_KEY="<your-generated-jwt>"
@@ -152,7 +164,14 @@ netstat -tlnp | grep 54321
 
 ### Health check
 ```bash
+# Via Supabase CLI
 curl http://localhost:54321/auth/v1/health
+
+# Via Kong (local services)
+curl http://localhost:8000/auth/v1/health
+
+# Direct GoTrue (no Kong)
+curl http://localhost:9999/health
 ```
 
 ### Docker not available

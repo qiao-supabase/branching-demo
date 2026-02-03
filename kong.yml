@@ -1,0 +1,91 @@
+_format_version: "3.0"
+_transform: true
+
+###
+# Kong Declarative Configuration for Local Supabase
+#
+# This configuration routes requests to backend services:
+# - /auth/v1/* -> GoTrue (authentication)
+# - /rest/v1/* -> PostgREST (REST API)
+###
+
+services:
+  # GoTrue (Auth) Service
+  - name: auth-v1
+    url: http://localhost:9999
+    routes:
+      - name: auth-v1-route
+        strip_path: true
+        paths:
+          - /auth/v1
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+            - apikey
+            - x-client-info
+          exposed_headers:
+            - X-Total-Count
+          credentials: true
+          max_age: 3600
+
+  # PostgREST (REST API) Service
+  - name: rest-v1
+    url: http://localhost:3000
+    routes:
+      - name: rest-v1-route
+        strip_path: true
+        paths:
+          - /rest/v1
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+            - apikey
+            - Prefer
+            - Range
+            - x-client-info
+          exposed_headers:
+            - Content-Range
+            - X-Total-Count
+          credentials: true
+          max_age: 3600
+      - name: key-auth
+        config:
+          key_names:
+            - apikey
+          key_in_body: false
+          hide_credentials: false
+
+# API key consumers for authentication
+consumers:
+  - username: anon
+    keyauth_credentials:
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+  - username: service_role
+    keyauth_credentials:
+      - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
