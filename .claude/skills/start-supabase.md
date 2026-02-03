@@ -88,6 +88,7 @@ For environments without Docker, install services individually. This option prov
 - **[setup-local-postgres.md](setup-local-postgres.md)** - PostgreSQL installation, database setup, Supabase-compatible schema, roles, and helper functions
 - **[setup-gotrue.md](setup-gotrue.md)** - GoTrue binary download, configuration, migrations, JWT generation, and API reference
 - **[setup-postgrest.md](setup-postgrest.md)** - PostgREST binary download, configuration, REST API setup, and usage examples
+- **[setup-storage.md](setup-storage.md)** - Storage API setup, file uploads/downloads, bucket management, and S3/MinIO integration
 
 ### Quick Start Summary
 
@@ -100,7 +101,10 @@ For environments without Docker, install services individually. This option prov
 7. **Download PostgREST** binary from [PostgREST releases](https://github.com/PostgREST/postgrest/releases)
 8. **Configure PostgREST** with environment variables (see [setup-postgrest.md](setup-postgrest.md))
 9. **Start PostgREST**: `./postgrest`
-10. **Generate JWT** and set environment variables
+10. **Clone Storage API** from [supabase/storage-api](https://github.com/supabase/storage-api)
+11. **Configure Storage** with `.env.storage` (see [setup-storage.md](setup-storage.md))
+12. **Start Storage API**: `npm run start`
+13. **Generate JWT** and set environment variables
 
 ### Environment Variables
 

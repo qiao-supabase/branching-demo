@@ -44,6 +44,19 @@ port = 54324
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
+# Enable image transformations (resizing, cropping, format conversion)
+[storage.image_transformation]
+enabled = true
+
+# S3 backend settings (uncomment for S3-compatible storage like MinIO)
+# [storage.s3]
+# enabled = false
+# endpoint = "http://localhost:9000"
+# region = "us-east-1"
+# access_key = ""
+# secret_key = ""
+# force_path_style = true
+
 [auth]
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.

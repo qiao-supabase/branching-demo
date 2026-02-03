@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "create-user": "npx tsx scripts/create-user.ts",
+    "storage": "npx tsx scripts/storage.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
