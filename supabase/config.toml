@@ -97,6 +97,15 @@ redirect_uri = ""
 # or any other third-party OIDC providers.
 url = ""
 
+[realtime]
+enabled = true
+# Port for the realtime service
+port = 4000
+# IP version to use (IPv4 or IPv6)
+ip_version = "IPv4"
+# Maximum number of connected clients
+max_connections = 200
+
 [analytics]
 enabled = false
 port = 54327
