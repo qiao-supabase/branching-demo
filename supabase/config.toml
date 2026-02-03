@@ -106,3 +106,22 @@ vector_port = 54328
 gcp_project_id = ""
 gcp_project_number = ""
 gcp_jwt_path = "supabase/gcloud.json"
+
+# Edge Runtime configuration for Edge Functions
+# See: https://supabase.com/docs/guides/functions
+[edge_runtime]
+enabled = true
+# Request handling policy: "oneshot" for development (hot reload), "per_worker" for load testing
+policy = "oneshot"
+# Port for Chrome DevTools inspector debugging
+inspector_port = 8083
+
+# Individual function configurations
+# Example: [functions.my-function]
+# verify_jwt = true      # Require valid JWT (default: true)
+# import_map = "./functions/my-function/deno.json"  # Custom import map
+# entrypoint = "./functions/my-function/index.ts"   # Custom entrypoint
+
+# Example hello-world function (JWT verification disabled for demo)
+[functions.hello-world]
+verify_jwt = false
