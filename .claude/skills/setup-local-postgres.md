@@ -172,11 +172,11 @@ export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
 
 echo '=== Roles ==='
-/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U supabase_admin -d postgres -c \\
+/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U postgres -d postgres -c \\
   \"SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin', 'anon', 'authenticated', 'service_role') ORDER BY rolname;\"
 
 echo '=== Schemas ==='
-/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U supabase_admin -d postgres -c \\
+/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U postgres -d postgres -c \\
   \"SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast') ORDER BY schema_name;\"
 "
 ```
@@ -215,7 +215,7 @@ Expected output:
 su - postgres -c "
 export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
-/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U supabase_admin -d postgres
+/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U postgres -d postgres
 "
 ```
 
