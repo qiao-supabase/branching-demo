@@ -137,22 +137,7 @@ export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
 # Should output: /run/postgresql:54322 - accepting connections
 ```
 
-## Step 8: Create Extensions Schema
-
-Create the extensions schema required before running migrations:
-
-```bash
-su - postgres -c "
-export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
-export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
-/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres <<'EOF'
-CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
-EOF
-"
-```
-
-## Step 9: Run Migrations
+## Step 8: Run Migrations
 
 The Supabase PostgreSQL build includes bundled migrations. Run them:
 
@@ -173,7 +158,7 @@ The migrations will:
 - Demote the `postgres` role from superuser
 - Configure proper permissions
 
-## Step 10: Verify Setup
+## Step 9: Verify Setup
 
 ```bash
 su - postgres -c "
