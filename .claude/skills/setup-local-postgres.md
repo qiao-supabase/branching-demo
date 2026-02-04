@@ -91,36 +91,17 @@ export NIX_PGLIBDIR='/opt/postgresql-17/lib'
 
 ## Step 6: Configure PostgreSQL
 
-Configure pg_hba.conf for trust authentication:
+The initdb command with `--auth=trust` generates a working pg_hba.conf with trust authentication for local connections. No modifications needed.
 
-```bash
-cat > /var/lib/postgresql/17/main/pg_hba.conf <<'EOF'
-# TYPE  DATABASE        USER            ADDRESS                 METHOD
-local   all             all                                     trust
-host    all             all             127.0.0.1/32            trust
-host    all             all             ::1/128                 trust
-EOF
-```
-
-Add Supabase settings to postgresql.conf:
+Append Supabase-required settings to postgresql.conf:
 
 ```bash
 cat >> /var/lib/postgresql/17/main/postgresql.conf <<'EOF'
 
 # Supabase settings
-listen_addresses = 'localhost'
-port = 5432
 shared_preload_libraries = 'pg_stat_statements'
 wal_level = logical
-max_wal_senders = 10
-max_replication_slots = 5
 EOF
-```
-
-Set ownership:
-```bash
-chown postgres:postgres /var/lib/postgresql/17/main/pg_hba.conf
-chown postgres:postgres /var/lib/postgresql/17/main/postgresql.conf
 ```
 
 ## Step 7: Start PostgreSQL
