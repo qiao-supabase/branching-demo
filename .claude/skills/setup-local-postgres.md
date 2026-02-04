@@ -132,10 +132,12 @@ Verify it's running:
 su - postgres -c "
 export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
-/opt/postgresql-17/bin/.pg_isready-wrapped
+/opt/postgresql-17/bin/.pg_isready-wrapped -h /tmp -p 54322
 "
-# Should output: /run/postgresql:54322 - accepting connections
+# Should output: /tmp:54322 - accepting connections
 ```
+
+**Note:** The bundled postgresql.conf configures the Unix socket in `/tmp`, not `/run/postgresql`. Always use `-h /tmp -p 54322` when connecting.
 
 ## Step 8: Run Migrations
 
@@ -147,10 +149,14 @@ export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
 export NIX_PGLIBDIR='/opt/postgresql-17/lib'
 export POSTGRES_PASSWORD=''
+export POSTGRES_PORT=54322
+export POSTGRES_HOST=/tmp
 cd /opt/postgresql-17/share/supabase-cli/migrations
 ./migrate.sh
 "
 ```
+
+**Important:** The `POSTGRES_PORT` and `POSTGRES_HOST` environment variables are required. The migrate.sh script defaults to port 5432 and localhost, which won't work with the Supabase configuration.
 
 The migrations will:
 - Create the `postgres` role and other API roles
@@ -166,11 +172,11 @@ export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
 
 echo '=== Roles ==='
-/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres -c \\
+/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U supabase_admin -d postgres -c \\
   \"SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin', 'anon', 'authenticated', 'service_role') ORDER BY rolname;\"
 
 echo '=== Schemas ==='
-/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres -c \\
+/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U supabase_admin -d postgres -c \\
   \"SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast') ORDER BY schema_name;\"
 "
 ```
@@ -209,7 +215,7 @@ Expected output:
 su - postgres -c "
 export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
-/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres
+/opt/postgresql-17/bin/.psql-wrapped -h /tmp -p 54322 -U supabase_admin -d postgres
 "
 ```
 
@@ -248,11 +254,21 @@ PostgreSQL binaries must be run as a non-root user. Use `su - postgres` as shown
 
 ### PostgreSQL connection refused
 ```bash
-# Check if PostgreSQL is running
-su - postgres -c "/opt/postgresql-17/bin/.pg_isready-wrapped"
+# Check if PostgreSQL is running (must specify socket dir and port)
+su - postgres -c "/opt/postgresql-17/bin/.pg_isready-wrapped -h /tmp -p 54322"
 
 # Start if not running
 su - postgres -c "/opt/postgresql-17/bin/.pg_ctl-wrapped -D /var/lib/postgresql/17/main start"
+```
+
+### "no response" on pg_isready
+The Supabase postgresql.conf uses `/tmp` as the Unix socket directory. Always use `-h /tmp -p 54322` flags when connecting. Without these flags, tools default to checking `/run/postgresql` on port 5432.
+
+### Migration fails with "connection refused" on port 5432
+The migrate.sh script defaults to port 5432. Set the correct environment variables:
+```bash
+export POSTGRES_PORT=54322
+export POSTGRES_HOST=/tmp
 ```
 
 ### Migration fails with "role already exists"
