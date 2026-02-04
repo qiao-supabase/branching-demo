@@ -98,12 +98,6 @@ Use the bundled Supabase configuration templates from the artifact:
 cp /opt/postgresql-17/share/supabase-cli/config/postgresql.conf.template \
    /var/lib/postgresql/17/main/postgresql.conf
 
-# Adjust settings for local development:
-# - Use standard port 5432 instead of 54322
-# - Use wal_level=logical for replication features
-sed -i 's/^port = 54322/port = 5432/' /var/lib/postgresql/17/main/postgresql.conf
-sed -i 's/^wal_level = replica/wal_level = logical/' /var/lib/postgresql/17/main/postgresql.conf
-
 # Set up pgsodium key script path
 PGSODIUM_SCRIPT="/opt/postgresql-17/share/supabase-cli/config/pgsodium_getkey.sh"
 echo "pgsodium.getkey_script = '$PGSODIUM_SCRIPT'" >> /var/lib/postgresql/17/main/postgresql.conf
@@ -113,6 +107,7 @@ chown postgres:postgres /var/lib/postgresql/17/main/postgresql.conf
 ```
 
 The bundled postgresql.conf.template includes:
+- Port 54322 (Supabase CLI default)
 - All Supabase extensions preloaded (pg_stat_statements, pg_cron, pg_net, pgsodium, supabase_vault, supautils)
 - Supautils reserved roles configuration
 - Conservative memory settings for local development
@@ -138,7 +133,7 @@ export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
 export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
 /opt/postgresql-17/bin/.pg_isready-wrapped
 "
-# Should output: /run/postgresql:5432 - accepting connections
+# Should output: /run/postgresql:54322 - accepting connections
 ```
 
 ## Step 8: Create Extensions Schema
