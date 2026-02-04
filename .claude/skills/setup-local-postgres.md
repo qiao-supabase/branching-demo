@@ -98,9 +98,10 @@ Use the bundled Supabase configuration templates from the artifact:
 cp /opt/postgresql-17/share/supabase-cli/config/postgresql.conf.template \
    /var/lib/postgresql/17/main/postgresql.conf
 
-# Set up pgsodium key script path
-PGSODIUM_SCRIPT="/opt/postgresql-17/share/supabase-cli/config/pgsodium_getkey.sh"
-echo "pgsodium.getkey_script = '$PGSODIUM_SCRIPT'" >> /var/lib/postgresql/17/main/postgresql.conf
+# Set up pgsodium and vault key script paths
+GETKEY_SCRIPT="/opt/postgresql-17/share/supabase-cli/config/pgsodium_getkey.sh"
+echo "pgsodium.getkey_script = '$GETKEY_SCRIPT'" >> /var/lib/postgresql/17/main/postgresql.conf
+echo "vault.getkey_script = '$GETKEY_SCRIPT'" >> /var/lib/postgresql/17/main/postgresql.conf
 
 # Set ownership
 chown postgres:postgres /var/lib/postgresql/17/main/postgresql.conf
