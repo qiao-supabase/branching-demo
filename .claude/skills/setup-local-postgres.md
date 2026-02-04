@@ -1,181 +1,308 @@
-# Setting Up Local PostgreSQL for Supabase
+# Setting Up Local PostgreSQL 17 for Supabase
 
 ## Overview
-This skill describes how to set up a local PostgreSQL instance with Supabase-compatible schema for development and testing without Docker.
+This skill describes how to install and set up PostgreSQL 17 with Supabase-compatible schema for development and testing without Docker. It uses the official Supabase PostgreSQL build which includes all required extensions.
 
 ## Prerequisites
-- PostgreSQL 15, 16, or 17 installed locally
+- Linux system (x64 or arm64)
+- Root access
+- curl and unzip installed
 
 ## Next Steps
 After completing PostgreSQL setup, see [setup-gotrue.md](setup-gotrue.md) for GoTrue (auth service) configuration.
 
-## Step 1: Stop PostgreSQL
+## Step 1: Download PostgreSQL 17
+
+Download the Supabase PostgreSQL build from GitHub Actions artifacts via nightly.link:
 
 ```bash
-service postgresql stop
+# For x64 systems
+curl -L -o /tmp/postgres-artifact.zip \
+  "https://nightly.link/supabase/postgres/actions/runs/21658919255/supabase-postgres-linux-x64.zip"
+
+# For arm64 systems
+curl -L -o /tmp/postgres-artifact.zip \
+  "https://nightly.link/supabase/postgres/actions/runs/21658919255/supabase-postgres-linux-arm64.zip"
 ```
 
-## Step 2: Replace pg_hba.conf
-
-Replace the existing pg_hba.conf with Supabase-compatible configuration:
+## Step 2: Extract and Install
 
 ```bash
-cat > /etc/postgresql/16/main/pg_hba.conf <<'EOF'
+# Extract the artifact
+mkdir -p /tmp/postgres-extract
+unzip -o /tmp/postgres-artifact.zip -d /tmp/postgres-extract
+
+# Install to /opt/postgresql-17
+mkdir -p /opt/postgresql-17
+cp -r /tmp/postgres-extract/* /opt/postgresql-17/
+chmod +x /opt/postgresql-17/bin/*
+
+# Clean up
+rm -rf /tmp/postgres-artifact.zip /tmp/postgres-extract
+```
+
+## Step 3: Set Up PATH
+
+```bash
+# Create profile.d script for system-wide PATH
+cat > /etc/profile.d/postgresql.sh << 'EOF'
+export PATH="/opt/postgresql-17/bin:$PATH"
+EOF
+chmod +x /etc/profile.d/postgresql.sh
+
+# For current session
+export PATH="/opt/postgresql-17/bin:$PATH"
+```
+
+Verify the installation:
+```bash
+/opt/postgresql-17/bin/psql --version
+# Should output: psql (PostgreSQL) 17.6
+```
+
+## Step 4: Create postgres User and Directories
+
+```bash
+# Create postgres user if it doesn't exist
+id postgres 2>/dev/null || useradd -r -m -s /bin/bash postgres
+
+# Create data and run directories
+mkdir -p /var/lib/postgresql/17/main
+mkdir -p /var/run/postgresql
+chown -R postgres:postgres /var/lib/postgresql/17
+chown postgres:postgres /var/run/postgresql
+```
+
+## Step 5: Initialize the Cluster
+
+Initialize the PostgreSQL cluster with `supabase_admin` as the bootstrap user:
+
+```bash
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+export NIX_PGLIBDIR='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.initdb-wrapped \
+  -D /var/lib/postgresql/17/main \
+  -U supabase_admin \
+  --auth=trust
+"
+```
+
+## Step 6: Configure PostgreSQL
+
+Configure pg_hba.conf for trust authentication:
+
+```bash
+cat > /var/lib/postgresql/17/main/pg_hba.conf <<'EOF'
 # TYPE  DATABASE        USER            ADDRESS                 METHOD
-
-# Local connections
-local all  supabase_admin                 trust
-local all  all                            trust
-host  all  all           127.0.0.1/32     trust
-host  all  all           ::1/128          trust
-
-# IPv4 external connections
-host  all  all  0.0.0.0/0     scram-sha-256
-
-# IPv6 external connections
-host  all  all  ::0/0         scram-sha-256
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            trust
+host    all             all             ::1/128                 trust
 EOF
 ```
 
-## Step 3: Reinitialize the Cluster
-
-Reinitialize the PostgreSQL cluster with `supabase_admin` as the bootstrap user. This allows all Supabase migrations to run correctly, including the `demote-postgres` security migration.
+Add Supabase settings to postgresql.conf:
 
 ```bash
-# Remove existing data (WARNING: destroys all data)
-rm -rf /var/lib/postgresql/16/main/*
+cat >> /var/lib/postgresql/17/main/postgresql.conf <<'EOF'
 
-# Reinitialize with supabase_admin as bootstrap user
-sudo -u postgres /usr/lib/postgresql/16/bin/initdb \
-  -D /var/lib/postgresql/16/main \
-  -U supabase_admin
-```
-
-## Step 4: Configure postgresql.conf
-
-Update postgresql.conf with Supabase-compatible settings:
-
-```bash
-cat > /etc/postgresql/16/main/postgresql.conf <<'EOF'
-# Connection settings
-listen_addresses = '*'
+# Supabase settings
+listen_addresses = 'localhost'
 port = 5432
-
-# File locations
-data_directory = '/var/lib/postgresql/16/main'
-hba_file = '/etc/postgresql/16/main/pg_hba.conf'
-ident_file = '/etc/postgresql/16/main/pg_ident.conf'
-
-# Memory
-shared_buffers = 128MB
-effective_cache_size = 128MB
-
-# WAL
+shared_preload_libraries = 'pg_stat_statements'
 wal_level = logical
 max_wal_senders = 10
 max_replication_slots = 5
-
-# Authentication
-password_encryption = scram-sha-256
-
-# Preloaded libraries
-shared_preload_libraries = 'pg_stat_statements'
-
-# Locale
-lc_messages = 'C'
-lc_monetary = 'C'
-lc_numeric = 'C'
-lc_time = 'C'
-
-# Timezone
-timezone = 'UTC'
-log_timezone = 'UTC'
 EOF
 ```
 
-## Step 5: Start PostgreSQL
-
+Set ownership:
 ```bash
-service postgresql start
+chown postgres:postgres /var/lib/postgresql/17/main/pg_hba.conf
+chown postgres:postgres /var/lib/postgresql/17/main/postgresql.conf
 ```
 
-## Step 6: Create Required Schemas and Extensions
-
-Create the pgbouncer schema, extensions schema, and pg_stat_statements extension required by Supabase migrations:
+## Step 7: Start PostgreSQL
 
 ```bash
-psql -U supabase_admin -d postgres <<'EOF'
--- Create pgbouncer user and schema
-CREATE USER pgbouncer;
-REVOKE ALL PRIVILEGES ON SCHEMA public FROM pgbouncer;
-CREATE SCHEMA pgbouncer AUTHORIZATION pgbouncer;
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+export NIX_PGLIBDIR='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.pg_ctl-wrapped \
+  -D /var/lib/postgresql/17/main \
+  -l /var/lib/postgresql/17/main/logfile \
+  start
+"
+```
 
-CREATE OR REPLACE FUNCTION pgbouncer.get_auth(p_usename TEXT)
-RETURNS TABLE(username TEXT, password TEXT) AS
-$$
-BEGIN
-    RAISE WARNING 'PgBouncer auth request: %', p_usename;
-    RETURN QUERY
-    SELECT usename::TEXT, passwd::TEXT FROM pg_catalog.pg_shadow
-    WHERE usename = p_usename;
-END;
-$$ LANGUAGE plpgsql SET search_path = '' SECURITY DEFINER;
+Verify it's running:
+```bash
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.pg_isready-wrapped
+"
+# Should output: /run/postgresql:5432 - accepting connections
+```
 
-REVOKE ALL ON FUNCTION pgbouncer.get_auth(p_usename TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(p_usename TEXT) TO pgbouncer;
+## Step 8: Create Extensions Schema
 
--- Create extensions schema and pg_stat_statements
+Create the extensions schema required before running migrations:
+
+```bash
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres <<'EOF'
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;
 EOF
+"
 ```
 
-## Step 7: Run Migrations
+## Step 9: Run Migrations
+
+The Supabase PostgreSQL build includes bundled migrations. Run them:
 
 ```bash
-# Clone Supabase postgres repository
-git clone --depth 1 https://github.com/supabase/postgres.git /tmp/supabase-postgres
-
-# Run migrations
-cd /tmp/supabase-postgres/migrations/db
-POSTGRES_PASSWORD=postgres ./migrate.sh
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+export NIX_PGLIBDIR='/opt/postgresql-17/lib'
+export POSTGRES_PASSWORD=''
+cd /opt/postgresql-17/share/supabase-cli/migrations
+./migrate.sh
+"
 ```
 
-The `demote-postgres` migration will succeed because `supabase_admin` is the bootstrap user with proper privileges.
+The migrations will:
+- Create the `postgres` role and other API roles
+- Set up all Supabase schemas (auth, storage, realtime, etc.)
+- Demote the `postgres` role from superuser
+- Configure proper permissions
 
-## Step 8: Verify postgres Role Was Demoted
+## Step 10: Verify Setup
 
 ```bash
-psql -U supabase_admin -d postgres -c "SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin');"
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+
+echo '=== Roles ==='
+/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres -c \\
+  \"SELECT rolname, rolsuper FROM pg_roles WHERE rolname IN ('postgres', 'supabase_admin', 'anon', 'authenticated', 'service_role') ORDER BY rolname;\"
+
+echo '=== Schemas ==='
+/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres -c \\
+  \"SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast') ORDER BY schema_name;\"
+"
 ```
 
 Expected output:
 ```
+=== Roles ===
     rolname     | rolsuper
 ----------------+----------
- supabase_admin | t
+ anon           | f
+ authenticated  | f
  postgres       | f
+ service_role   | f
+ supabase_admin | t
+
+=== Schemas ===
+  schema_name
+----------------
+ auth
+ extensions
+ graphql
+ graphql_public
+ pgbouncer
+ public
+ realtime
+ storage
+ vault
+```
+
+---
+
+## Helper Commands
+
+### Connect to PostgreSQL
+```bash
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.psql-wrapped -U supabase_admin -d postgres
+"
+```
+
+### Stop PostgreSQL
+```bash
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.pg_ctl-wrapped -D /var/lib/postgresql/17/main stop
+"
+```
+
+### Check PostgreSQL Status
+```bash
+su - postgres -c "
+export PATH='/opt/postgresql-17/bin:/usr/bin:/bin'
+export LD_LIBRARY_PATH='/opt/postgresql-17/lib'
+/opt/postgresql-17/bin/.pg_ctl-wrapped -D /var/lib/postgresql/17/main status
+"
+```
+
+### View Logs
+```bash
+tail -f /var/lib/postgresql/17/main/logfile
 ```
 
 ---
 
 ## Troubleshooting
 
+### "Exec format error"
+You downloaded the wrong architecture. Check your system architecture with `uname -m` and download the matching artifact (x64 for x86_64, arm64 for aarch64).
+
+### "cannot be run as root"
+PostgreSQL binaries must be run as a non-root user. Use `su - postgres` as shown in the examples.
+
 ### PostgreSQL connection refused
 ```bash
 # Check if PostgreSQL is running
-pg_isready -h localhost
+su - postgres -c "/opt/postgresql-17/bin/.pg_isready-wrapped"
 
-# Start PostgreSQL
-service postgresql start
+# Start if not running
+su - postgres -c "/opt/postgresql-17/bin/.pg_ctl-wrapped -D /var/lib/postgresql/17/main start"
 ```
 
-### "role does not exist"
+### Migration fails with "role already exists"
+If you've run partial setup before, you may need to reinitialize:
 ```bash
-psql -U supabase_admin -d postgres -c "CREATE ROLE supabase_admin WITH LOGIN SUPERUSER PASSWORD 'postgres';"
+# Stop PostgreSQL first
+su - postgres -c "/opt/postgresql-17/bin/.pg_ctl-wrapped -D /var/lib/postgresql/17/main stop"
+
+# Remove data directory and start fresh from Step 5
+rm -rf /var/lib/postgresql/17/main/*
 ```
 
 ---
+
+## Bundled Extensions
+
+The Supabase PostgreSQL 17 build includes these Supabase-specific extensions:
+- supautils
+- pg_graphql
+- pgsodium
+- supabase_vault
+- pg_net
+- pg_cron
+
+Plus 100+ standard PostgreSQL extensions.
 
 ## Schema Components
 
@@ -187,8 +314,7 @@ The migration scripts create these schemas:
 | `storage` | File storage metadata |
 | `realtime` | Real-time subscriptions |
 | `extensions` | PostgreSQL extensions |
-| `graphql_public` | GraphQL API |
-| `pgsodium` | Encryption functions |
+| `graphql` / `graphql_public` | GraphQL API |
 | `vault` | Secret management |
 | `pgbouncer` | Connection pooling authentication |
 
@@ -196,8 +322,8 @@ The migration scripts create these schemas:
 
 | Role | Purpose |
 |------|---------|
-| `postgres` | Database owner (demoted after migrations) |
 | `supabase_admin` | Bootstrap superuser for migrations |
+| `postgres` | Database owner (demoted after migrations) |
 | `anon` | Unauthenticated API access |
 | `authenticated` | Authenticated user access |
 | `service_role` | Admin access, bypasses RLS |
@@ -208,5 +334,5 @@ The migration scripts create these schemas:
 
 ## Reference
 
-- Migration scripts: https://github.com/supabase/postgres/tree/develop/migrations/db
 - Supabase Postgres: https://github.com/supabase/postgres
+- PostgreSQL 17 artifacts: https://github.com/supabase/postgres/actions
