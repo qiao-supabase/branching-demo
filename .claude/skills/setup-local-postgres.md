@@ -91,18 +91,31 @@ export NIX_PGLIBDIR='/opt/postgresql-17/lib'
 
 ## Step 6: Configure PostgreSQL
 
-The initdb command with `--auth=trust` generates a working pg_hba.conf with trust authentication for local connections. No modifications needed.
-
-Append Supabase-required settings to postgresql.conf:
+Use the bundled Supabase configuration templates from the artifact:
 
 ```bash
-cat >> /var/lib/postgresql/17/main/postgresql.conf <<'EOF'
+# Copy the bundled postgresql.conf template
+cp /opt/postgresql-17/share/supabase-cli/config/postgresql.conf.template \
+   /var/lib/postgresql/17/main/postgresql.conf
 
-# Supabase settings
-shared_preload_libraries = 'pg_stat_statements'
-wal_level = logical
-EOF
+# Adjust settings for local development:
+# - Use standard port 5432 instead of 54322
+# - Use wal_level=logical for replication features
+sed -i 's/^port = 54322/port = 5432/' /var/lib/postgresql/17/main/postgresql.conf
+sed -i 's/^wal_level = replica/wal_level = logical/' /var/lib/postgresql/17/main/postgresql.conf
+
+# Set up pgsodium key script path
+PGSODIUM_SCRIPT="/opt/postgresql-17/share/supabase-cli/config/pgsodium_getkey.sh"
+echo "pgsodium.getkey_script = '$PGSODIUM_SCRIPT'" >> /var/lib/postgresql/17/main/postgresql.conf
+
+# Set ownership
+chown postgres:postgres /var/lib/postgresql/17/main/postgresql.conf
 ```
+
+The bundled postgresql.conf.template includes:
+- All Supabase extensions preloaded (pg_stat_statements, pg_cron, pg_net, pgsodium, supabase_vault, supautils)
+- Supautils reserved roles configuration
+- Conservative memory settings for local development
 
 ## Step 7: Start PostgreSQL
 
