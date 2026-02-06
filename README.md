@@ -1,3 +1,3 @@
 # branching-demo
 
-Demo project for setting up Supabase Branching...
+Demo project for setting up Supabase Branching
