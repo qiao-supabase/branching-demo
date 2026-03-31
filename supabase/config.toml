@@ -255,7 +255,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 enabled = true
 
 [remotes.staging]
-project_id = "bvikqvbczudanvggcord"
+project_id = "tqymbknzakiqyyoahpid"
 
 [remotes.staging.db.seed]
 enabled = true
