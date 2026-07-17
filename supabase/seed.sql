@@ -20741,5 +20741,3 @@ SELECT pg_catalog.setval('"public"."countries_id_seq"', 249, true);
 --
 -- PostgreSQL database dump complete
 --
-
-RESET ALL;
