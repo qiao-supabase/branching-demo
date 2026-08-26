@@ -16,7 +16,7 @@ extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
 [api.tls]
-enabled = false
+enabled = true
 
 [db]
 # Port to use for the local database URL.
@@ -261,7 +261,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 enabled = true
 
 [remotes.staging]
-project_id = "bvikqvbczudanvggcord"
+project_id = "tqymbknzakiqyyoahpid"
 
 [remotes.staging.db.seed]
 enabled = true
