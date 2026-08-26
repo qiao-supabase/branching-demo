@@ -227,6 +227,12 @@ enabled = true
 policy = "oneshot"
 inspector_port = 8083
 
+[functions.hello]
+enabled = true
+
+[functions.listen]
+entrypoint = "./functions/listen/utils.ts"
+
 [analytics]
 enabled = true
 port = 54327
